@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-pod-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-pod-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-pod-provisioner
+    spec:
+      serviceAccountName: nfs-pod-provisioner-sa # name of service account created in rbac.yaml
+      containers:
+        - name: nfs-pod-provisioner
+          image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+          volumeMounts:
+            - name: nfs-provisioner-v
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME # do not change
+              value: nfs-pod-provisioner # SAME AS PROVISONER NAME VALUE IN STORAGECLASS
+            - name: NFS_SERVER # do not change
+              value: 10.0.2.7 # Ip of the NFS SERVER
+            - name: NFS_PATH # do not change
+              value: /var/nfsshare # path to nfs directory setup
+      volumes:
+       - name: nfs-provisioner-v # same as volumemouts name
+         nfs:
+           server: 10.0.2.7
+           path: /var/nfsshare

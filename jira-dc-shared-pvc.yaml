@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jira-dc-config
+data:
+  ATL_PROXY_PORT: "80"
+  ATL_JDBC_URL: "jdbc:postgresql://postgres:5432/jira"
+  ATL_JDBC_USER: "jira"
+  ATL_JDBC_PASSWORD: "atlassian"
+  ATL_DB_DRIVER: "org.postgresql.Driver"
+  ATL_DB_TYPE: "postgres72"
+  ATL_DB_SCHEMA_NAME: "public"
+  CLUSTERED: "true"
+  JIRA_SHARED_HOME: "/var/atlassian/shared"
+  EHCACHE_OBJECT_PORT: "40011"

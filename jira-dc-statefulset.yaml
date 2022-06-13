@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: jira-dc
+spec:
+  serviceName: jira-dc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jira-dc
+  template:
+    metadata:
+      labels:
+        app: jira-dc
+    spec:
+      containers:
+        - name: jira-dc
+          image: atlassian/jira-software:8.20.3
+          resources:
+            requests:
+              memory: "4G"
+              cpu: "2"
+          ports:
+            - containerPort: 8080
+              name: jiraport
+            - containerPort: 40001
+              name: jiraclusterport
+            - containerPort: 40011
+              name: remote-object
+          env:
+            - name: JIRA_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: EHCACHE_LISTENER_HOSTNAME
+              value: "$(JIRA_NODE_ID).jira-dc.default.svc.cluster.local"
+            - name: JVM_MINIMUM_MEMORY
+              value: "1G"
+            - name: JVM_MAXIMUM_MEMORY
+              value: "2G"
+          envFrom:
+            - configMapRef:
+                name: jira-dc-config
+          volumeMounts:
+            - mountPath: "/var/atlassian/application-data/jira"
+              name: home
+            - mountPath: "/var/atlassian/shared"
+              name: shared-home
+      volumes:
+        - name: home
+          emptyDir:
+            {}
+        - name: shared-home
+          persistentVolumeClaim:
+            claimName: jira-dc-shared-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: home
+    spec:
+      accessModes: ["ReadWriteMany"]
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: nfs-storageclass
