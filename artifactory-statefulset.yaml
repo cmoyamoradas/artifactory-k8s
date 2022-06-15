@@ -60,6 +60,9 @@ spec:
             - 'bash'
             - '-c'
             - 'rm -fv /var/opt/jfrog/artifactory/etc/db.properties'
+          volumeMounts:
+            - name: artifactory-volume
+              mountPath: "/var/opt/jfrog/artifactory"
         - name: "remove-lost-found"
           image: "releases-docker.jfrog.io/jfrog/ubi-minimal:8.5-204"
           imagePullPolicy: IfNotPresent
@@ -80,6 +83,9 @@ spec:
             - 'bash'
             - '-c'
             - 'rm -rfv /var/opt/jfrog/artifactory/lost+found /var/opt/jfrog/artifactory/data/.lock'
+          volumeMounts:
+            - name: artifactory-volume
+              mountPath: "/var/opt/jfrog/artifactory"
         - name: 'copy-system-yaml'
           image: 'releases-docker.jfrog.io/jfrog/ubi-minimal:8.5-204'
           securityContext:
@@ -127,6 +133,8 @@ spec:
                   name: artifactory
                   key: master-key
           volumeMounts:
+            - name: artifactory-volume
+              mountPath: "/var/opt/jfrog/artifactory"
             - name: systemyaml
               mountPath: "/tmp/etc/system.yaml"
               subPath: system.yaml
