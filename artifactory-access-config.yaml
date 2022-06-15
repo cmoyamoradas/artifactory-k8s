@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: artifactory-access-config
+  labels:
+    app: artifactory
+    chart: artifactory-107.38.10
+    heritage: Helm
+    release: artifactory
+type: Opaque
+stringData:
+  access.config.patch.yml: |
+    security:
+      tls: false
