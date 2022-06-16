@@ -81,7 +81,13 @@ $ sudo yum install nfs-utils
 ## Dynamic NFS provisioning
 In this example, we’re going to provision NFS resources in both manually and dynamically ways. For the dynamic NFS provisioning, we need to deploy a [nfs provisioner](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) on our Kubernetes cluster. 
 
-There are some object to be created before deploying the nfs provisioner. First, we create a [Service Account](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) and some roles and role bindings required by Kubernetes:
+There are some object to be created before deploying the nfs provisioner. Let's create previously a dedicated namespace
+
+```
+[kubi@master ~]$ kubectl apply -f rbac.yaml --namespace nfs
+```
+
+Then, we create a [Service Account](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) and some roles and role bindings required by Kubernetes:
 
 **rbac.yaml**
 ```
@@ -145,7 +151,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 ```
-[kubi@master ~]$ kubectl apply -f rbac.yaml
+[kubi@master ~]$ kubectl apply -f rbac.yaml --namespace nfs
 serviceaccount/nfs-pod-provisioner-sa created
 clusterrole.rbac.authorization.k8s.io/nfs-provisioner-clusterRole created
 clusterrolebinding.rbac.authorization.k8s.io/nfs-provisioner-rolebinding created
@@ -166,7 +172,7 @@ parameters:
   archiveOnDelete: "false"
 ```
 ```
-kubi@master ~]$ kubectl apply -f nfs-class.yaml
+kubi@master ~]$ kubectl apply -f nfs-class.yaml --namespace nfs
 storageclass.storage.k8s.io/nfs-storageclass created
 ```
 
@@ -193,7 +199,7 @@ spec:
       serviceAccountName: nfs-pod-provisioner-sa # name of service account created in rbac.yaml
       containers:
         - name: nfs-pod-provisioner
-          image: quay.io/external_storage/nfs-client-provisioner:latest
+          image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
           volumeMounts:
             - name: nfs-provisioner-v
               mountPath: /persistentvolumes
@@ -201,172 +207,109 @@ spec:
             - name: PROVISIONER_NAME # do not change
               value: nfs-pod-provisioner # SAME AS PROVISONER NAME VALUE IN STORAGECLASS
             - name: NFS_SERVER # do not change
-              value: 10.0.2.15 # Ip of the NFS SERVER
+              value: 10.186.0.12 # Ip of the NFS SERVER
             - name: NFS_PATH # do not change
               value: /var/nfsshare # path to nfs directory setup
       volumes:
-       - name: nfs-provisioner-v # same as volumeMounts name
+       - name: nfs-provisioner-v # same as volumemounts name
          nfs:
-           server: 10.0.2.15 # Ip of the NFS SERVER
+           server: 10.186.0.12 # Ip of the NFS SERVER
            path: /var/nfsshare # path to nfs directory setup
 ```
 ```
-[kubi@master ~]$ kubectl apply -f nfs-provisioner-deployment.yaml 
+[kubi@master ~]$ kubectl apply -f nfs-provisioner-deployment.yaml --namespace nfs
 deployment.apps/nfs-pod-provisioner created
 
-[kubi@master  ~]$ kubectl get pods
+[kubi@master  ~]$ kubectl get pods --namespace nfs
 NAME                                   READY   STATUS    RESTARTS   AGE
-nfs-pod-provisioner-54499dd8ff-x9lt7   1/1     Running   0          34s
+nfs-pod-provisioner-6fd58ddc6d-nspt8   1/1     Running   0          27s
 ```
 
-## Deploying PostgreSQL instance
-For this example, we’re going to use PostgreSQL as database. We just need to setup a single instance. For that, we’ll follow the steps below:
+## Deploying a JFrog Artifactory instance
+To setup a JFrog Artifactory instance in Kubernetes, we will require the following objects:
 
-We deploy a ConfigMap with the configuration of our instance:
+- 4 Secrets:
+-- artifactory-access-config
+-- artifactory-binarystore
+-- artifactory
+-- artifactory-systemyaml
+
+- 2 ConfigMaps:
+-- artifactory-migration-scripts
+-- artifactory-installer-info
+
+- 2 PersistentVolumeClaims:
+-- artifactory-backup-pvc
+-- artifactory-data-pvc
+
+- 1 Stafefulset:
+-- artifactory
+
+- 1 Service, to make accessible the artifactory pod inside the Kubernetes cluster
+-- artifactory
+
+First, we create the namespace 'artifactory'
 ```
-[kubi@master ~]$ kubectl apply -f postgres-config.yaml 
-configmap/postgres-config created
-``` 
-
-We create a PersistentVolume manually:
+[kubi@master ~]$ kubectl create namespace artifactory
+namespace/artifactory created
 ```
-[kubi@master ~]$ kubectl apply -f postgres-pv-nfs.yaml
-persistentvolume/postgres-pv-nfs-volume created
 
-[kubi@master ~]$ kubectl get pv
-NAME                     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                                          STORAGECLASS       REASON   AGE
-postgres-pv-nfs-volume   2Gi        RWO            Retain           Available   default/postgres-persistent-nfs-volume-claim   nfs-storageclass            8s
-``` 
-
-We need a PersistentVolumeClaim. We create it manually:
+Now, let’s start with the secrets:
 ```
-[kubi@master ~]$ kubectl apply -f postgres-pvc-nfs.yaml 
-persistentvolumeclaim/postgres-persistent-nfs-volume-claim created
+[kubi@master ~]$ kubectl apply -f artifactory-access-config.yaml -f artifactory-binarystore-secret.yaml -f artifactory-secrets.yaml -f artifactory-system.yaml --namespace artifactory
+secret/artifactory-access-config created
+secret/artifactory-binarystore created
+secret/artifactory created
+secret/artifactory-systemyaml created
 
-[kubi@master ~]$ kubectl get pvc
-NAME                                   STATUS   VOLUME                   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-postgres-persistent-nfs-volume-claim   Bound    postgres-pv-nfs-volume   2Gi        RWO            nfs-storageclass  5s
-``` 
-
-Before to apply the Postgres deployment, we need to create manually the folder /var/nfsshare/pgdata in the NFS server:
+[kubi@master ~]$kubectl get secrets --namespace artifactory
+NAME                        TYPE                                  DATA   AGE
+artifactory                 Opaque                                2      2m18s
+artifactory-access-config   Opaque                                1      4m58s
+artifactory-binarystore     Opaque                                1      2m18s
+artifactory-systemyaml      Opaque                                1      2m18s
+default-token-wcv5h         kubernetes.io/service-account-token   3      6m17s
 ```
-[cmoya@storage ~]$ sudo mkdir /var/nfsshare/pgdata
-``` 
-
-Now, we apply the Postgres deployment manifest:
+Then, with the Configmaps:
 ```
-[kubi@master ~]$ kubectl apply -f postgres-deployment-nfs.yaml 
-deployment.apps/postgres created
+[kubi@master ~]$ kubectl apply -f artifactory-migration-scripts.yaml -f artifactory-installer-info.yaml --namespace artifactory
+configmap/artifactory-migration-scripts created
+configmap/artifactory-installer-info created
 
-[kubi@master ~]$ kubectl get pods
-NAME                                   READY   STATUS    RESTARTS   AGE
-nfs-pod-provisioner-54499dd8ff-x9lt7   1/1     Running   0          26m
-postgres-6997bbb746-v6cmp              1/1     Running   0          5m18s
-``` 
-
-Let’s check that everything went well:
+[kubi@master ~]$ kubectl get configmaps --namespace artifactory
+NAME                            DATA   AGE
+artifactory-installer-info      1      50s
+artifactory-migration-scripts   3      50s
+kube-root-ca.crt                1      10m
 ```
-[kubi@master ~]$ kubectl logs postgres-6997bbb746-v6cmp
-The files belonging to this database system will be owned by user "postgres".
-This user must also own the server process.
-The database cluster will be initialized with locale "en_US.utf8".
-The default database encodin:wq!g has accordingly been set to "UTF8".
-The default text search configuration will be set to "english".
-Data page checksums are disabled.
-fixing permissions on existing directory /var/lib/postgresql/data ... ok
-creating subdirectories ... ok
-selecting default max_connections ... 100
-selecting default shared_buffers ... 128MB
-selecting default timezone ... Etc/UTC
-selecting dynamic shared memory implementation ... posix
-creating configuration files ... ok
-running bootstrap script ... ok
-performing post-bootstrap initialization ... ok
-WARNING: enabling "trust" authentication for local connections
-You can change this by editing pg_hba.conf or using the option -A, or
---auth-local and --auth-host, the next time you run initdb.
-syncing data to disk ... ok
-Success. You can now start the database server using:
-    pg_ctl -D /var/lib/postgresql/data -l logfile start
-waiting for server to start....LOG:  database system was shut down at 2020-09-02 13:56:38 UTC
-LOG:  MultiXact member wraparound protections are now enabled
-LOG:  database system is ready to accept connections
-LOG:  autovacuum launcher started
- done
-server started
-CREATE DATABASE
-/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
-waiting for server to shut down...LOG:  received fast shutdown request
-LOG:  aborting any active transactions
-LOG:  autovacuum launcher shutting down
-.LOG:  shutting down
-LOG:  database system is shut down
- done
-server stopped
-PostgreSQL init process complete; ready for start up.
-LOG:  database system was shut down at 2020-09-02 13:57:02 UTC
-LOG:  MultiXact member wraparound protections are now enabled
-LOG:  database system is ready to accept connections
-LOG:  autovacuum launcher started
-``` 
-
-Finally, we create a Service to make the database accessible inside the cluster:
+PersistentVolumeClaims:
 ```
-[kubi@master ~]$ kubectl apply -f postgres-svc.yaml 
-service/postgres created
+[kubi@master ~]$ kubectl apply -f artifactory-data-pvc.yaml -f artifactory-backup-pvc.yaml --namespace artifactory
+persistentvolumeclaim/artifactory-data-pvc created
+persistentvolumeclaim/artifactory-backup-pvc created
 
-[kubi@master ~]$ kubectl get svc
-NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP    171m
-postgres     ClusterIP   10.96.123.91   <none>        5432/TCP   8s
-``` 
-
-## Deploying a Jira Software Data Center cluster
-To setup a Jira Software Data Center cluster in Kubernetes, we will require the following objects:
-
-- A ConfigMap, that we’ll use to configure most of the properties of our Jira Software cluster.
-
-- A PersistentVolumeClaim, that we’ll create manually because we just need one shared volume across the cluster.
-
-- A Statefulset, that is a specific way to deploy an application cluster, offering advanced features not present in a normal Deployment object
-
-- A Service, to make accessible the pods inside the Kubernetes cluster
-
-Let’s start:
+[kubi@master ~]$ kubectl get pvc --namespace artifactory
+NAME                     STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS       AGE
+artifactory-backup-pvc   Bound    pvc-131d1583-5358-4b6b-afdc-890bb40bf97e   1G         RWX            nfs-storageclass   39s
+artifactory-data-pvc     Bound    pvc-36c415c0-62ab-4d30-ab75-aac6cfeee91c   1G         RWX            nfs-storageclass   39s
 ```
-[kubi@master ~]$ kubectl apply -f jira-dc-config.yaml 
-configmap/jira-dc-config created
+Now it's time for the Statefulset, to create the pod:
+```
+[kubi@master ~]$ kubectl apply -f artifactory-statefulset.yaml --namespace artifactory
+statefulset.apps/artifactory created
 
-[kubi@master ~]$ kubectl get configmaps
-NAME              DATA   AGE
-jira-dc-config    10     11s
-postgres-config   3      37m
+[kubi@master ~]$ kubectl get pods --namespace artifactory
+NAME            READY   STATUS    RESTARTS   AGE
+artifactory-0   1/1     Running   0          2m9s
+```
+Finally, let's deploy the Service:
+```
+[kubi@master ~]$ kubectl apply -f artifactory-service.yaml --namespace artifactory
+service/artifactory created
 
-[kubi@master ~]$ kubectl apply -f jira-dc-shared-pvc.yaml 
-persistentvolumeclaim/jira-dc-shared-pvc created
-
-[kubi@master ~]$ kubectl get pvc
-NAME                                   STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS       AGE
-jira-dc-shared-pvc                     Bound    pvc-bb8dfae3-b15b-435d-9781-93a99bf8b4e7   1G         RWX            nfs-storageclass   9s
-postgres-persistent-nfs-volume-claim   Bound    postgres-pv-nfs-volume                     10Gi       RWO                               32m
-
-[kubi@master ~]$ kubectl apply -f jira-dc-statefulset.yaml 
-statefulset.apps/jira-dc created
-
-[kubi@master ~]$ kubectl get pods
-NAME                                   READY   STATUS    RESTARTS   AGE
-jira-dc-0                              1/1     Running   0          4m3s
-nfs-pod-provisioner-54499dd8ff-x9lt7   1/1     Running   0          51m
-postgres-6997bbb746-v6cmp              1/1     Running   0          30m
-
-kubi@master ~]$ kubectl apply -f jira-dc-svc.yaml 
-service/jira-dc created
-
-[kubi@master ~]$ kubectl get svc
-NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                               AGE
-jira-dc      ClusterIP   None           <none>        80/TCP,8888/TCP,40001/TCP,40011/TCP   6s
-kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP                               3h14m
-postgres     ClusterIP   10.96.123.91   <none>        5432/TCP                              23m
+[kubi@master ~]$ kubectl get svc --namespace artifactory
+NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
+artifactory   ClusterIP   10.105.10.128   <none>        8082/TCP,8081/TCP   31s
 ```
 
 ## Setup an Ingress Controller
@@ -374,34 +317,34 @@ As per [Kubernetes official documentation](https://kubernetes.io/docs/concepts/s
 
 You must have an [Ingress controller](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers) to satisfy an Ingress. For this example, we’re using the [Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx/blob/master/README.md) officially supported by Kubernetes. We follow the instructions to install it in a [Bare-metal scenario](https://kubernetes.github.io/ingress-nginx/deploy/#bare-metal):
 ```
-[kubi@master ~]$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.0/deploy/static/provider/baremetal/deploy.yaml
+[kubi@master ~]$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.2.1/deploy/static/provider/baremetal/deploy.yaml
 namespace/ingress-nginx created
 serviceaccount/ingress-nginx created
-configmap/ingress-nginx-controller created
-clusterrole.rbac.authorization.k8s.io/ingress-nginx created
-clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx created
-role.rbac.authorization.k8s.io/ingress-nginx created
-rolebinding.rbac.authorization.k8s.io/ingress-nginx created
-service/ingress-nginx-controller-admission created
-service/ingress-nginx-controller created
-deployment.apps/ingress-nginx-controller created
-ingressclass.networking.k8s.io/nginx created
-validatingwebhookconfiguration.admissionregistration.k8s.io/ingress-nginx-admission created
 serviceaccount/ingress-nginx-admission created
-clusterrole.rbac.authorization.k8s.io/ingress-nginx-admission created
-clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+role.rbac.authorization.k8s.io/ingress-nginx created
 role.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx-admission created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx created
 rolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+configmap/ingress-nginx-controller created
+service/ingress-nginx-controller created
+service/ingress-nginx-controller-admission created
+deployment.apps/ingress-nginx-controller created
 job.batch/ingress-nginx-admission-create created
 job.batch/ingress-nginx-admission-patch created
+ingressclass.networking.k8s.io/nginx configured
+validatingwebhookconfiguration.admissionregistration.k8s.io/ingress-nginx-admission configured
 
 [kubi@master ~]$ kubectl get services -n ingress-nginx
-NAME                                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
-ingress-nginx-controller             NodePort    10.100.176.3    <none>        80:32400/TCP,443:32320/TCP   37s
-ingress-nginx-controller-admission   ClusterIP   10.96.122.129   <none>        443/TCP                      38s
+NAME                                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+ingress-nginx-controller             NodePort    10.101.240.232   <none>        80:30726/TCP,443:31770/TCP   64s
+ingress-nginx-controller-admission   ClusterIP   10.109.184.230   <none>        443/TCP                      64s
 ```
 
-By default, this installation works in “NopePort” mode. We need to change that to “LoadBalancer”, because we plan to use a separate LoadBalancer who will be responsible to allocate external IPs to our cluster.
+By default, this installation works in “NopePort” mode. We need to change that to “LoadBalancer”, because we plan to use a separate LoadBalancer that will be responsible to allocate external IPs to our cluster.
 ```
 [kubi@master ~]$ kubectl edit service ingress-nginx-controller -n ingress-nginx
 service/ingress-nginx-controller edited
@@ -410,21 +353,22 @@ service/ingress-nginx-controller edited
   
   sessionAffinity: None
   type: LoadBalancer # Previous value was NodePort
-```
-```
-kubi@master ~]$ kubectl get services -n ingress-nginx
-NAME                                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
-ingress-nginx-controller             LoadBalancer   10.100.176.3    <pending>     80:32400/TCP,443:32320/TCP   2m27s
-ingress-nginx-controller-admission   ClusterIP      10.96.122.129   <none>        443/TCP                      2m28s
-Deploy an Ingress object
-```
-```
-[kubi@master ~]$ kubectl apply -f jira-dc-ingress.yaml 
-ingress.networking.k8s.io/jira-dc-ingress created
 
-[kubi@master ~]$ kubectl get ingress
-NAME              CLASS   HOSTS   ADDRESS   PORTS   AGE
-jira-dc-ingress   nginx   *                 80      16s
+
+[kubi@master ~]$ kubectl get services -n ingress-nginx
+NAME                                 TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+ingress-nginx-controller             LoadBalancer   10.101.240.232   <pending>     80:30726/TCP,443:31770/TCP   3m43s
+ingress-nginx-controller-admission   ClusterIP      10.109.184.230   <none>        443/TCP                      3m43s
+
+```
+Deploy the Ingress object
+```
+[kubi@master ~]$ kubectl apply -f artifactory-ingress.yaml --namespace artifactory
+ingress.networking.k8s.io/artifactory-ingress created
+
+[kubi@master ~]$ kubectl get ingress --namespace artifactory
+NAME                  CLASS   HOSTS   ADDRESS   PORTS   AGE
+artifactory-ingress   nginx   *                 80      40s
 ```
 
 ## Setup Metallb load balancer
@@ -438,29 +382,5 @@ ingress-nginx-controller             LoadBalancer   10.101.80.192   10.0.2.25   
 ingress-nginx-controller-admission   ClusterIP      10.109.10.92    <none>        443/TCP                      18m
 ```
 
-The IP address that appears in the EXTERNAL-IP section of the ingress-nginx-controller is the one through which we can access to our Jira Software Data Center application. 
+The IP address that appears in the EXTERNAL-IP section of the ingress-nginx-controller is the one through which we can access to our JFrog Artifactory instance.
 
-We have to connect to the Jira application and finish the setup process before scaling the cluster from 1 node to 2
-
-## Scaling the Jira Software Data Center cluster
-For now, we have just 1 node in the cluster:
-```
-[kubi@master ~]$ kubectl get pods
-NAME                                   READY   STATUS    RESTARTS   AGE
-jira-dc-0                              1/1     Running   0          7m38s
-nfs-pod-provisioner-54499dd8ff-4qmkt   1/1     Running   1          19d
-postgres-6997bbb746-lf5nd              1/1     Running   1          19d
-```
-
-To scale it, what we have to do is scaling the statefulset previously deployed:
-```
-[kubi@master ~]$ kubectl scale statefulset jira-dc --replicas=2
-statefulset.apps/jira-dc scaled
-
-[kubi@master ~]$ kubectl get pods
-NAME                                   READY   STATUS    RESTARTS   AGE
-jira-dc-0                              1/1     Running   0          9m47s
-jira-dc-1                              1/1     Running   0          27s
-nfs-pod-provisioner-54499dd8ff-4qmkt   1/1     Running   1          19d
-postgres-6997bbb746-lf5nd              1/1     Running   1          19d
-```
