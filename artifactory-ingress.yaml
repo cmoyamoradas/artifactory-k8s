@@ -18,6 +18,6 @@ spec:
               service:
                 name: artifactory
                 port:
-                  number: 80
+                  number: 8082
             path: /
             pathType: Prefix
