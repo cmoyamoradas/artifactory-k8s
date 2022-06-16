@@ -9,8 +9,7 @@ metadata:
     heritage: Helm
     release: artifactory
 spec:
-  #type: LoadBalancer
-
+  type: LoadBalancer
   externalTrafficPolicy: Cluster
   ports:
     # DEPRECATION NOTE: The following is to maintain support for values pre 1.3.0 and
