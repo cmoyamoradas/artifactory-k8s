@@ -10,7 +10,7 @@ These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernete
 - Deploying a JFrog Artifactory instance
 - Setup an Ingress Controller
 - Deploy an Ingress object
-- Setup Metallb load balancer
+- Setup a load balancer
 
 ## Pre-requisites
 - You need a Kubernetes cluster up-and-running in order to run this example.
