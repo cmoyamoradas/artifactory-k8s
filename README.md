@@ -11,7 +11,6 @@ These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernete
 - Setup an Ingress Controller
 - Deploy an Ingress object
 - Setup Metallb load balancer
-- Scaling the Jira Software Data Center cluster
 
 ## Pre-requisites
 - You need a Kubernetes cluster up-and-running in order to run this example.
@@ -313,7 +312,7 @@ artifactory   ClusterIP   10.105.10.128   <none>        8082/TCP,8081/TCP   31s
 ```
 
 ## Setup an Ingress Controller
-As per [Kubernetes official documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/), an **Ingress** object may provide load balancing, SSL termination and name-based virtual hosting. We require this kind of object to load balance our Jira Software Data Center multi-node deployment.
+As per [Kubernetes official documentation](https://kubernetes.io/docs/concepts/services-networking/ingress/), an **Ingress** object may provide load balancing, SSL termination and name-based virtual hosting. We require this kind of object to access our JFrog Artifactory instance from outside the cluster.
 
 You must have an [Ingress controller](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers) to satisfy an Ingress. For this example, we’re using the [Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx/blob/master/README.md) officially supported by Kubernetes. We follow the instructions to install it in a [Bare-metal scenario](https://kubernetes.github.io/ingress-nginx/deploy/#bare-metal):
 ```
