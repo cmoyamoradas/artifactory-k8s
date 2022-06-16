@@ -369,17 +369,25 @@ ingress.networking.k8s.io/artifactory-ingress created
 NAME                  CLASS   HOSTS   ADDRESS   PORTS   AGE
 artifactory-ingress   nginx   *                 80      40s
 ```
+## Setup a load balancer
+The load balancer is the element in the architecture that will provide the external IP to the ingress service.
+We can face two scenarios:
+- Kubernetes cluster deployed on a bare metal or virtualized infrastructure, either on premise or Cloud IaaS provider (AWS, GCP, Azure, etc.)
+- Kubernetes cluster deployed on a Cloud Kubernetes service such as GKE, AKE, EKS, etc.
 
-## Setup Metallb load balancer
-We follow the instructions to Install Metallb on Kubernetes cluster described in the [MetalLB official documentation](https://metallb.universe.tf/installation/) 
+I'm just covering here the first scenario, split in two sub-scenarios
 
-After having followed the installation process, if we have a look at the ingress services, we should already see that an external IP has been assigned to the controller:
+### Bare metal or virtualized on premise infrastructure
+For this scenario, we can rely on [Metallb](https://metallb.universe.tf). To install Metallb on Kubernetes cluster described in the [MetalLB official documentation](https://metallb.universe.tf/installation/)
+
+After having followed the installation process, if we have a look at the ingress services, we should already see that an external IP has been assigned to the ingress service:
 ```
 [kubi@master ~]$ kubectl get services -n ingress-nginx
-NAME                                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
-ingress-nginx-controller             LoadBalancer   10.101.80.192   10.0.2.25     80:31742/TCP,443:31578/TCP   18m
-ingress-nginx-controller-admission   ClusterIP      10.109.10.92    <none>        443/TCP                      18m
+NAME                                 TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+ingress-nginx-controller             LoadBalancer   10.101.240.232   10.186.0.21   80:30726/TCP,443:31770/TCP   4h33m
+ingress-nginx-controller-admission   ClusterIP      10.109.184.230   <none>        443/TCP                      4h33m
 ```
 
-The IP address that appears in the EXTERNAL-IP section of the ingress-nginx-controller is the one through which we can access to our JFrog Artifactory instance.
+The IP address that appears in the EXTERNAL-IP section of the ingress-nginx-controller service is the one through which we can access to our JFrog Artifactory instance.
 
+### VMs on Cloud IaaS provider (AWS, GCP, Azure)
