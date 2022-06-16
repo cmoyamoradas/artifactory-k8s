@@ -274,7 +274,7 @@ spec:
         name: artifactory-volume
       spec:
         storageClassName: "nfs-storageclass"
-        accessModes: [ "ReadWriteOnce" ]
+        accessModes: [ "ReadWriteMany" ]
         resources:
           requests:
             storage: 2G
