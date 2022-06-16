@@ -21,3 +21,10 @@ spec:
                   number: 8082
             path: /
             pathType: Prefix
+          - backend:
+              service:
+                name: artifactory
+                port:
+                  number: 8081
+            path: /artifactory/*
+            pathType: Prefix
