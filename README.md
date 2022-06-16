@@ -1,14 +1,13 @@
-# Deploy Jira Data Center on a Kubernetes cluster
+# Deploy JFrog Artifactory on a Kubernetes cluster
 
-Kubernetes manifests to deploy a Jira Software Data Center with Postgres, Ingress Nginx and Metallb
+These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernetes cluster
 
 ## On this page
 - Pre-requisites
 - Setup a NFS Server
 - Setup NFS Clients
 - Dynamic NFS provisioning
-- Deploying PostgreSQL instance
-- Deploying a Jira Software Data Center cluster
+- Deploying a JFrog Artifactory instance
 - Setup an Ingress Controller
 - Deploy an Ingress object
 - Setup Metallb load balancer
@@ -17,11 +16,10 @@ Kubernetes manifests to deploy a Jira Software Data Center with Postgres, Ingres
 ## Pre-requisites
 - You need a Kubernetes cluster up-and-running in order to run this example.
 - You need a shared storage. For this example, we will use an external server (external to the Kubernetes cluster, I mean) and NFS protocol. In the following sections we’re going to describe how to configure this.
-- You need to deploy a PostgreSQL instance on the cluster. For this example, we’re going to setup a single instance of a PostgreSQL database.
 - You need to setup a load balancer to provision an external IP to make accessible the application from outside of the Kubernetes cluster.
 
 ## Setup a NFS Server
-I will consider that we’re setting up the NFS Server on CentOS 7, to stay consistent with the other servers.
+I will consider that we’re setting up the NFS Server on CentOS Stream 9, to stay consistent with the other servers.
 
 Procedure and commands may be different from other Linux distributions. 
 
@@ -39,7 +37,7 @@ $ sudo mkdir /var/nfsshare
 We change the permissions of the folder as follows:
 ```
 $ sudo chmod -R 755 /var/nfsshare
-$ sudo chown -R nfsnobody:nfsnobody /var/nfsshare
+$ sudo chown -R nobody:nobody /var/nfsshare
 ``` 
 
 Next, we need to start the services and enable them to be started at boot time:
