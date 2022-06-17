@@ -391,3 +391,27 @@ ingress-nginx-controller-admission   ClusterIP      10.109.184.230   <none>     
 The IP address that appears in the EXTERNAL-IP section of the ingress-nginx-controller service is the one through which we can access to our JFrog Artifactory instance.
 
 ### VMs on Cloud IaaS provider (AWS, GCP, Azure)
+Unfortunately, in a Cloud provider scenario, where the kubernetes cluster is deployed on some VMs, the majority of providers don't support the network protocols that Metallb requires.
+More info [here](https://metallb.universe.tf/installation/clouds/).
+
+The alternative would be to configure a load balancer in your Cloud provider with a static IP address and then configure the ingress service with this particular IP address.
+```
+[kubi@master ~]$ kubectl edit svc ingress-nginx-controller --namespace ingress-nginx
+```
+```
+...
+spec:
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 10.101.240.232
+  clusterIPs:
+  - 10.101.240.232
+  externalIPs: ¢ New property to be added
+  - 10.186.0.21 ¢ Static IP address from the load balancer
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  loadBalancerIP: 10.186.0.21 # New property to be added, with the static IP address from the load balancer
+ ...
+```
