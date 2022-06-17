@@ -163,7 +163,22 @@ spec:
               mkdir -p /var/opt/jfrog/artifactory/log;
               bash $scriptsPath/migrationStatus.sh 7.38.10 3600 > >(tee /var/opt/jfrog/artifactory/log/helm-migration.log) 2>&1;
           env:
+          - name: JF_SHARED_DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: artifactory-database-creds
+                  key: db-user
 
+          - name: JF_SHARED_DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: artifactory-database-creds
+                key: db-password
+          - name: JF_SHARED_DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: artifactory-database-creds
+                key: db-url
           volumeMounts:
             - name: migration-scripts
               mountPath: "/tmp/migrate.sh"
@@ -199,7 +214,22 @@ spec:
               fi;
               exec /entrypoint-artifactory.sh
           env:
+          - name: JF_SHARED_DATABASE_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: artifactory-database-creds
+                key: db-user
 
+          - name: JF_SHARED_DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: artifactory-database-creds
+                key: db-password
+          - name: JF_SHARED_DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: artifactory-database-creds
+                key: db-url
           ports:
             - containerPort: 8082
               name: http
