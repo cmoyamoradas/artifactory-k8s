@@ -22,7 +22,7 @@ stringData:
         -Dartifactory.async.corePoolSize=8
       database:
         type: "postgresql"
-        driver: "org.postgresql.Driver
+        driver: "org.postgresql.Driver"
     artifactory:
       database:
         maxOpenConnections: 80
