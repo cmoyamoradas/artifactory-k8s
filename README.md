@@ -1,6 +1,8 @@
 # Deploy JFrog Artifactory on a Kubernetes cluster
 
-These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernetes cluster
+These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernetes cluster.
+
+These manifests are configured to use the embedded Derby database and use NFS mounts as storage system for the binaries.
 
 ## On this page
 - Pre-requisites
