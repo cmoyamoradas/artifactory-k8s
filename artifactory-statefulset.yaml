@@ -61,7 +61,7 @@ spec:
             - '-c'
             - 'rm -fv /var/opt/jfrog/artifactory/etc/db.properties'
           volumeMounts:
-            - name: artifactory-volume
+            - name: artifactory-data
               mountPath: "/var/opt/jfrog/artifactory"
         - name: "remove-lost-found"
           image: "releases-docker.jfrog.io/jfrog/ubi-minimal:8.5-204"
