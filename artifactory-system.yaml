@@ -9,7 +9,7 @@ metadata:
     release: artifactory
 type: Opaque
 stringData:
-  system.yaml:
+  system.yaml: |
     router:
       serviceRegistry:
         insecure: false
