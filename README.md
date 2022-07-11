@@ -20,7 +20,7 @@ These manifests are configured to use the embedded Derby database and use NFS mo
 - You need to setup a load balancer to provision an external IP to make accessible the application from outside of the Kubernetes cluster.
 
 ## Setup a NFS Server
-I will consider that we’re setting up the NFS Server on CentOS Stream 9, to stay consistent with the other servers.
+I will consider that we’re setting up the NFS Server on CentOS 7, to stay consistent with the other servers.
 
 Procedure and commands may be different from other Linux distributions. 
 
@@ -257,19 +257,21 @@ namespace/artifactory created
 
 Now, let’s start with the secrets:
 ```
-[kubi@master ~]$ kubectl apply -f artifactory-access-config.yaml -f artifactory-binarystore-secret.yaml -f artifactory-secrets.yaml -f artifactory-system.yaml --namespace artifactory
+[kubi@master ~]$ kubectl apply -f artifactory-access-config.yaml -f artifactory-binarystore-secret.yaml -f artifactory-secrets.yaml -f artifactory-system.yaml -f artifactory-database-secrets.yaml --namespace artifactory
 secret/artifactory-access-config created
 secret/artifactory-binarystore created
 secret/artifactory created
 secret/artifactory-systemyaml created
+secret/artifactory-database-creds created
 
 [kubi@master ~]$kubectl get secrets --namespace artifactory
-NAME                        TYPE                                  DATA   AGE
-artifactory                 Opaque                                2      2m18s
-artifactory-access-config   Opaque                                1      4m58s
-artifactory-binarystore     Opaque                                1      2m18s
-artifactory-systemyaml      Opaque                                1      2m18s
-default-token-wcv5h         kubernetes.io/service-account-token   3      6m17s
+NAME                         TYPE                                  DATA   AGE
+artifactory                  Opaque                                2      14m
+artifactory-access-config    Opaque                                1      14m
+artifactory-binarystore      Opaque                                1      14m
+artifactory-database-creds   Opaque                                3      14m
+artifactory-systemyaml       Opaque                                1      14m
+default-token-6rp2p          kubernetes.io/service-account-token   3      14m
 ```
 Then, with the Configmaps:
 ```
