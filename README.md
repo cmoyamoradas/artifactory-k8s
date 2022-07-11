@@ -2,7 +2,7 @@
 
 These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernetes cluster.
 
-These manifests are configured to use the embedded Derby database and use NFS mounts as storage system for the binaries.
+These manifests are configured to use an external PostgreSQL database and use NFS mounts as storage system for the binaries.
 
 ## On this page
 - Pre-requisites
