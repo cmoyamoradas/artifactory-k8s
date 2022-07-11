@@ -21,8 +21,8 @@ stringData:
         -Dartifactory.access.client.max.connections=50
         -Dartifactory.async.corePoolSize=8
       database:
-        type: "postgresql"
-        driver: "org.postgresql.Driver"
+        type: postgresql
+        driver: org.postgresql.Driver
     artifactory:
       database:
         maxOpenConnections: 80
