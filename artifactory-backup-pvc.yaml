@@ -14,9 +14,4 @@ spec:
     - ReadWriteMany #  must be the same as PersistentVolume
   resources:
     requests:
-      storage: 1G
-  selector:
-    matchLabels:
-      id: artifactory-backup-pv
-      app: artifactory
-      release: artifactory
+      storage: 4G
