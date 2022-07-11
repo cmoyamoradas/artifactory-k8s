@@ -301,12 +301,12 @@ spec:
         - name: access-config
           secret:
             secretName: artifactory-access-config
-  volumeClaimTemplates:
-    - metadata:
-        name: artifactory-volume
-      spec:
-        storageClassName: "nfs-storageclass"
-        accessModes: [ "ReadWriteMany" ]
-        resources:
-          requests:
-            storage: 10G
+  #volumeClaimTemplates:
+  #  - metadata:
+  #      name: artifactory-volume
+  #    spec:
+  #      storageClassName: "nfs-storageclass"
+  #      accessModes: [ "ReadWriteMany" ]
+  #      resources:
+  #        requests:
+  #          storage: 10G
