@@ -214,6 +214,8 @@ spec:
               fi;
               exec /entrypoint-artifactory.sh
           env:
+          - name: JF_SHARED_NODE_HAENABLED
+            value: "true"
           - name: JF_SHARED_DATABASE_USERNAME
             valueFrom:
               secretKeyRef:
