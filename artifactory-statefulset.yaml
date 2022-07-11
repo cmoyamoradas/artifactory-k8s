@@ -84,7 +84,7 @@ spec:
             - '-c'
             - 'rm -rfv /var/opt/jfrog/artifactory/lost+found /var/opt/jfrog/artifactory/data/.lock'
           volumeMounts:
-            - name: artifactory-volume
+            - name: artifactory-data
               mountPath: "/var/opt/jfrog/artifactory"
         - name: 'copy-system-yaml'
           image: 'releases-docker.jfrog.io/jfrog/ubi-minimal:8.5-204'
@@ -133,7 +133,7 @@ spec:
                   name: artifactory
                   key: master-key
           volumeMounts:
-            - name: artifactory-volume
+            - name: artifactory-data
               mountPath: "/var/opt/jfrog/artifactory"
             - name: systemyaml
               mountPath: "/tmp/etc/system.yaml"
