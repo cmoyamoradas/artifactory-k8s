@@ -9,7 +9,7 @@ metadata:
     release: artifactory
 type: Opaque
 stringData:
-  system.yaml: |
+  system.yaml:
     router:
       serviceRegistry:
         insecure: false
@@ -23,9 +23,9 @@ stringData:
       database:
         type: "postgresql"
         driver: "org.postgresql.Driver"
-        url: jdbc:postgresql://10.26.48.3:5432/artifactoryk8s?sslmode=disable
-        username: postgres
-        password: c0nan101
+        #url: jdbc:postgresql://10.26.48.3:5432/artifactoryk8s?sslmode=disable
+        #username: postgres
+        #password: c0nan101
     artifactory:
       database:
         maxOpenConnections: 80
