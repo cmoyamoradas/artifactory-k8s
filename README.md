@@ -229,11 +229,12 @@ nfs-pod-provisioner-6fd58ddc6d-nspt8   1/1     Running   0          27s
 ## Deploying a JFrog Artifactory instance
 To setup a JFrog Artifactory instance in Kubernetes, we will require the following objects:
 
-- 4 Secrets:
+- 5 Secrets:
 -- artifactory-access-config
 -- artifactory-binarystore
 -- artifactory
 -- artifactory-systemyaml
+-- artifactory-database-creds
 
 - 2 ConfigMaps:
 -- artifactory-migration-scripts
@@ -273,6 +274,13 @@ artifactory-database-creds   Opaque                                3      14m
 artifactory-systemyaml       Opaque                                1      14m
 default-token-6rp2p          kubernetes.io/service-account-token   3      14m
 ```
+NOTE: For the database credentials, you may create the secrets using kubectl, ensuring that the name of the secret stays "artifactory-database-creds"
+```
+[kubi@master ~]$kubectl create secret generic artifactory-database-creds --from-literal=db-user='XXXXXX' --from-literal=db-password='YYYYYYY' --from-literal=db-url='jdbc:postgresql://[hostanme|IP]:[port]/[dbname]?sslmode=disable'
+```
+
+
+
 Then, with the Configmaps:
 ```
 [kubi@master ~]$ kubectl apply -f artifactory-migration-scripts.yaml -f artifactory-installer-info.yaml --namespace artifactory
