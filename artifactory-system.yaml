@@ -4,7 +4,7 @@ metadata:
   name: artifactory-systemyaml
   labels:
     app: artifactory
-    chart: artifactory-107.38.10
+    chart: artifactory-107.39.4
     heritage: Helm
     release: artifactory
 type: Opaque
@@ -21,8 +21,8 @@ stringData:
         -Dartifactory.access.client.max.connections=50
         -Dartifactory.async.corePoolSize=8
       database:
-        type: postgresql
-        driver: org.postgresql.Driver
+        type: "postgresql"
+        driver: "org.postgresql.Driver"
     artifactory:
       database:
         maxOpenConnections: 80

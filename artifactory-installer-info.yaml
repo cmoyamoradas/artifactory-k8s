@@ -4,9 +4,9 @@ metadata:
   name: artifactory-installer-info
   labels:
     app: artifactory
-    chart: artifactory-107.38.10
+    chart: artifactory-107.39.4
     heritage: Helm
     release: artifactory
 data:
   installer-info.json: |
-    {"productId": "Helm_artifactory/107.38.10", "features": [ { "featureId": "Platform/kubernetes"}]}
+    {"productId": "Helm_artifactory/107.39.4", "features": [ { "featureId": "Platform/kubernetes"}]}

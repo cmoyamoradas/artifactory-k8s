@@ -1,0 +1,22 @@
+### Artifactory HA backup
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: artifactory-backup-pv
+  labels:
+    app: artifactory
+    chart: artifactory-107.39.4
+    heritage: Helm
+    release: artifactory
+    id: artifactory-backup-pv
+    type: nfs-volume
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 10.186.0.12
+    path: "/backup"
+    readOnly: false

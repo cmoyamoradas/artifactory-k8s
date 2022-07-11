@@ -4,7 +4,7 @@ metadata:
   name: artifactory
   labels:
     app: artifactory
-    chart: artifactory-107.38.10
+    chart: artifactory-107.39.4
     component: artifactory
     heritage: Helm
     release: artifactory

@@ -4,7 +4,7 @@ metadata:
   name: artifactory
   labels:
     app: artifactory
-    chart: artifactory-107.38.10
+    chart: artifactory-107.39.4
     component: artifactory
     heritage: Helm
     release: artifactory
@@ -22,16 +22,16 @@ spec:
     metadata:
       labels:
         app: artifactory
-        chart: artifactory-107.38.10
+        chart: artifactory-107.39.4
         heritage: Helm
         role: artifactory
         component: artifactory
         release: artifactory
       annotations:
-        checksum/database-secrets: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/binarystore: 20fb58b992ceb12e0acabe0ad93517039ef18345abf7cf64fc23bf0e69c82eae
-        checksum/systemyaml: 68012a86d8423c8e780eea651d90c4194fdf3e494c63ad8b5c62d56e561ddf2e
-        checksum/access-config: 510b788263491d21677adcc17cdbe28b084f8abee2a50667ee120fa1cb07c3b0
+        checksum/database-secrets: fd830412432443f108ca52136a298d4657349c9c48763ea4f35b44d65eb929db
+        checksum/binarystore: 8c237cef6b5ecd7d0c3527f7689bc877db532dafb6db8750f79e2ff1f7285bc6
+        checksum/systemyaml: dcc7f3df1aff1fc1be232bd95a98bff18a89b08c7396391257fc3b7767ba44df
+        checksum/access-config: b4e808c9f6fc0f53a782e789123029c4127e730571a54b9b130e420d13c141a8
         checksum/admin-creds: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
     spec:
       serviceAccountName: default
@@ -142,7 +142,7 @@ spec:
               mountPath: "/tmp/etc/access.config.patch.yml"
               subPath: access.config.patch.yml
         - name: 'migration-artifactory'
-          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.38.10
+          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.39.4
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -161,7 +161,7 @@ spec:
               cp -fv /tmp/migrationHelmInfo.yaml $scriptsPath/migrationHelmInfo.yaml;
               cp -fv /tmp/migrationStatus.sh $scriptsPath/migrationStatus.sh;
               mkdir -p /var/opt/jfrog/artifactory/log;
-              bash $scriptsPath/migrationStatus.sh 7.38.10 3600 > >(tee /var/opt/jfrog/artifactory/log/helm-migration.log) 2>&1;
+              bash $scriptsPath/migrationStatus.sh 7.39.4 3600 > >(tee /var/opt/jfrog/artifactory/log/helm-migration.log) 2>&1;
           env:
           - name: JF_SHARED_DATABASE_USERNAME
             valueFrom:
@@ -195,7 +195,7 @@ spec:
               mountPath: "/var/opt/jfrog/artifactory-backup"
       containers:
         - name: artifactory
-          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.38.10
+          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.39.4
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
