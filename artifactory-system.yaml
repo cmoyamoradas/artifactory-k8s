@@ -50,5 +50,7 @@ stringData:
     metadata:
       database:
         maxOpenConnections: 80
-    jfconnect:
+    jfconnect::
+      enabled: true
+    mc:
       enabled: true
