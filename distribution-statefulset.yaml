@@ -1,0 +1,335 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: distribution
+  labels:
+    app: distribution
+    chart: distribution-102.13.4
+    heritage: Helm
+    release: distribution
+    component: distribution
+spec:
+  serviceName: distribution-headless
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: distribution
+      release: distribution
+      role: distribution
+  template:
+    metadata:
+      labels:
+        app: distribution
+        chart: distribution-102.13.4
+        release: distribution
+        role: distribution
+        component: distribution
+      annotations:
+        checksum/database-secrets: abd5540928291871125c36851287836843664f11c1c28fed880016c01099d9f0
+        checksum/systemyaml: a5d9092916e9954184afed702362e70ba86f4ee40654d1bb026a8ea4468e7436
+    spec:
+      serviceAccountName: default
+      securityContext:
+        runAsUser: 1020
+        fsGroup: 1020
+      initContainers:
+        - name: 'copy-system-yaml'
+          image: 'releases-docker.jfrog.io/jfrog/ubi-minimal:8.5-204'
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 10m
+              memory: 50Mi
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              sleep 30;
+              if [[ -e "/var/opt/jfrog/distribution/etc/filebeat.yaml" ]]; then chmod 644 /var/opt/jfrog/distribution/etc/filebeat.yaml; fi;
+              echo "Copy system.yaml to /var/opt/jfrog/distribution/etc";
+              mkdir -p /var/opt/jfrog/distribution/etc;
+              cp -fv /tmp/etc/system.yaml /var/opt/jfrog/distribution/etc/system.yaml;
+              echo "Remove /var/opt/jfrog/distribution/lost+found folder if exists";
+              rm -rfv /var/opt/jfrog/distribution/lost+found;
+              echo "Copy joinKey to /var/opt/jfrog/distribution/etc/security";
+              mkdir -p /var/opt/jfrog/distribution/etc/security;
+              echo ${DISTRIBUTION_JOIN_KEY} > /var/opt/jfrog/distribution/etc/security/join.key;
+              echo "Copy masterKey to /var/opt/jfrog/distribution/etc/security";
+              mkdir -p /var/opt/jfrog/distribution/etc/security;
+              echo ${DISTRIBUTION_MASTER_KEY} > /var/opt/jfrog/distribution/etc/security/master.key;
+          env:
+            - name: DISTRIBUTION_JOIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: distribution
+                  key: join-key
+            - name: DISTRIBUTION_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: distribution
+                  key: master-key
+          volumeMounts:
+            - name: distribution-data
+              mountPath: "/var/opt/jfrog/distribution"
+            - name: systemyaml
+              mountPath: "/tmp/etc/system.yaml"
+              subPath: system.yaml
+      containers:
+        - name: distribution
+          image: releases-docker.jfrog.io/jfrog/distribution-distribution:2.13.4
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1020
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          ports:
+            - name: http-distro
+              containerPort: 8080
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              exec /opt/jfrog/distribution/app/bin/wrapper.sh;
+          env:
+            - name: JF_SHARED_DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: distribution-database-creds
+                  key: db-user
+
+            - name: JF_SHARED_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: distribution-database-creds
+                  key: db-password
+            - name: JF_SHARED_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: distribution-database-creds
+                  key: db-url
+            - name: JF_SHARED_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: distribution
+                  key: redis-password
+            - name: JF_SHARED_REDIS_CONNECTIONSTRING
+              value: 'redis://localhost:6379'
+          volumeMounts:
+            - name: distribution-data
+              mountPath: "/var/opt/jfrog/distribution"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl --fail --max-time 5 http://localhost:8080/api/v1/system/readiness
+            initialDelaySeconds: 5
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl --fail --max-time 5 http://localhost:8080/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+            successThreshold: 1
+
+        - name: router
+          image: releases-docker.jfrog.io/jfrog/router:7.38.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              exec /opt/jfrog/router/app/bin/entrypoint-router.sh;
+          env:
+            - name: JF_ROUTER_TOPOLOGY_LOCAL_REQUIREDSERVICETYPES
+              value: jfds,jfob
+          ports:
+            - name: http-router
+              containerPort: 8082
+          volumeMounts:
+            - name: distribution-data
+              mountPath: "/var/opt/jfrog/router"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8082/router/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8082/router/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+            successThreshold: 1
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8082/router/api/v1/system/readiness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+            successThreshold: 1
+
+        - name: observability
+          image: releases-docker.jfrog.io/jfrog/observability:1.6.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/sh'
+            - '-c'
+            - >
+              exec /opt/jfrog/observability/app/bin/entrypoint-observability.sh;
+          volumeMounts:
+            - name: distribution-data
+              mountPath: "/var/opt/jfrog/observability"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl --fail --max-time 5 http://localhost:8036/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 90
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl --fail --max-time 5 http://localhost:8036/api/v1/system/liveness
+            initialDelaySeconds: 0
+            failureThreshold: 5
+            timeoutSeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+
+        - name: redis
+          image: releases-docker.jfrog.io/bitnami/redis:6.2.6-debian-10-r43
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          env:
+            - name: REDIS_REPLICATION_MODE
+              value: master
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: distribution
+                  key: redis-password
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DISABLE_COMMANDS
+              value: FLUSHDB,FLUSHALL
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 1
+            exec:
+              command:
+                - redis-cli
+                - ping
+          livenessProbe:
+            initialDelaySeconds: 30
+            timeoutSeconds: 1
+            exec:
+              command:
+                - redis-cli
+                - ping
+          resources:
+            {}
+          volumeMounts:
+            - name: redis-data
+              mountPath: /bitnami/redis/data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: distribution
+                    release: distribution
+      volumes:
+
+        ########## External secrets ###########
+
+        #########  unifiedSecretInstallation ###########
+        ############ If single secret installation flag is disable ############
+        - name: systemyaml
+          secret:
+            secretName: distribution-systemyaml
+
+        ############ Config map, Volumes and Custom Volumes ##############
+        - name: distribution-data
+          emptyDir:
+            sizeLimit: 5Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: [ 'ReadWriteOnce' ]
+        storageClassName: "nfs-storageclass"
+        resources:
+          requests:
+            storage: 10Gi

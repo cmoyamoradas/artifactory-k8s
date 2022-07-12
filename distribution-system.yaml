@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: distribution-systemyaml
+  labels:
+    app: distribution
+    chart: distribution-102.13.4
+    component: distribution
+    heritage: Helm
+    release: distribution
+type: Opaque
+stringData:
+  system.yaml: |
+    router:
+      serviceRegistry:
+        insecure: false
+    shared:
+      logging:
+        consoleLog:
+          enabled: false
+      jfrogUrl: "http://10.186.0.21"
+      database:
+        type: "postgresql"
+        driver: "org.postgresql.Driver"
+    distribution:
+      extraJavaOpts: >
