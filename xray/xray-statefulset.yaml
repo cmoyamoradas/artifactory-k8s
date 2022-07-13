@@ -1,0 +1,524 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xray
+  labels:
+    app: xray
+    chart: xray-103.52.4
+    heritage: Helm
+    release: xray
+    component: xray
+spec:
+  serviceName: "xray"
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: xray
+      release: xray
+      component: xray
+  template:
+    metadata:
+      labels:
+        app: xray
+        release: xray
+        component: xray
+      annotations:
+        checksum/database-secrets: 28f7df8f96700c31b19bfd102baaeade5deba6f25f39924092e67d70e30d765a
+        checksum/systemyaml: c5055cd9e8610038a91f15f160696402644dd09ed34caff780f32f2b8f0b07b6
+    spec:
+      serviceAccountName: default
+      securityContext:
+        runAsUser: 1035
+        fsGroup: 1035
+      initContainers:
+        - name: 'copy-system-yaml'
+          image: 'releases-docker.jfrog.io/jfrog/ubi-minimal:8.5-204'
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 10m
+              memory: 50Mi
+          command:
+            - 'bash'
+            - '-c'
+            - >
+              if [[ -e "/var/opt/jfrog/xray/etc/filebeat.yaml" ]]; then chmod 644 /var/opt/jfrog/xray/etc/filebeat.yaml; fi;
+              echo "Copy system.yaml to /var/opt/jfrog/xray/etc";
+              mkdir -p /var/opt/jfrog/xray/etc;
+              cp -fv /tmp/etc/system.yaml /var/opt/jfrog/xray/etc/system.yaml;
+              echo "Remove /var/opt/jfrog/xray/lost+found folder if exists";
+              rm -rfv /var/opt/jfrog/xray/lost+found;
+              echo "Copy joinKey to /var/opt/jfrog/xray/etc/security";
+              mkdir -p /var/opt/jfrog/xray/etc/security;
+              echo ${XRAY_JOIN_KEY} > /var/opt/jfrog/xray/etc/security/join.key;
+              echo "Copy masterKey to /var/opt/jfrog/xray/etc/security";
+              mkdir -p /var/opt/jfrog/xray/etc/security;
+              echo ${XRAY_MASTER_KEY} > /var/opt/jfrog/xray/etc/security/master.key;
+          env:
+            - name: XRAY_JOIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xray
+                  key: join-key
+            - name: XRAY_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xray
+                  key: master-key
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/xray"
+            - name: systemyaml
+              mountPath: "/tmp/etc/system.yaml"
+              subPath: system.yaml
+      containers:
+        - name: router
+          image: releases-docker.jfrog.io/jfrog/router:7.38.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1035
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/sh'
+            - '-c'
+            - >
+              exec /opt/jfrog/router/app/bin/entrypoint-router.sh;
+          env:
+            - name: JF_ROUTER_TOPOLOGY_LOCAL_REQUIREDSERVICETYPES
+              value: jfxr,jfxana,jfxidx,jfxpst,jfob
+          ports:
+            - name: http-router
+              containerPort: 8082
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/router"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8082/router/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8082/router/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+            successThreshold: 1
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8082/router/api/v1/system/readiness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+            successThreshold: 1
+
+        - name: observability
+          image: releases-docker.jfrog.io/jfrog/observability:1.6.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/sh'
+            - '-c'
+            - >
+              exec /opt/jfrog/observability/app/bin/entrypoint-observability.sh;
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/observability"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl --fail --max-time 5 http://localhost:8036/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 90
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl --fail --max-time 5 http://localhost:8036/api/v1/system/liveness
+            initialDelaySeconds: 0
+            failureThreshold: 5
+            timeoutSeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+
+        - name: xray-server
+          image: releases-docker.jfrog.io/jfrog/xray-server:3.52.4
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1035
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              exec /opt/jfrog/xray/app/bin/wrapper.sh;
+          env:
+            - name: JF_SHARED_DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-user
+
+            - name: JF_SHARED_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-password
+            - name: JF_SHARED_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-url
+            - name: JF_SHARED_RABBITMQ_USERNAME
+              value: guest
+            - name: JF_SHARED_RABBITMQ_URL
+              value: amqp://xray-rabbitmq:5672/
+            - name: JF_SHARED_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-rabbitmq
+                  key: rabbitmq-password
+            - name: XRAY_K8S_ENV
+              value: "true"
+            - name: EXECUTION_JOB_AES_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xray
+                  key: execution-service-aes-key
+          ports:
+            - containerPort: 8000
+              name: http-server
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/xray"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8000/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:8000/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+        - name: xray-analysis
+          image: releases-docker.jfrog.io/jfrog/xray-analysis:3.52.4
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1035
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              exec /opt/jfrog/xray/app/bin/wrapper.sh;
+          env:
+            - name: JF_SHARED_DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-user
+
+            - name: JF_SHARED_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-password
+            - name: JF_SHARED_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-url
+            - name: JF_SHARED_RABBITMQ_USERNAME
+              value: guest
+            - name: JF_SHARED_RABBITMQ_URL
+              value: amqp://xray-rabbitmq:5672/
+            - name: JF_SHARED_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-rabbitmq
+                  key: rabbitmq-password
+            - name: XRAY_HA_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: XRAY_K8S_ENV
+              value: "true"
+            - name: EXECUTION_JOB_AES_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xray
+                  key: execution-service-aes-key
+          ports:
+            - containerPort: 7000
+              name: http-analysis
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/xray"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:7000/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 1
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:7000/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+        - name: xray-indexer
+          image: releases-docker.jfrog.io/jfrog/xray-indexer:3.52.4
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1035
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              exec /opt/jfrog/xray/app/bin/wrapper.sh;
+          env:
+            - name: JF_SHARED_DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-user
+
+            - name: JF_SHARED_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-password
+            - name: JF_SHARED_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-url
+            - name: JF_SHARED_RABBITMQ_USERNAME
+              value: guest
+            - name: JF_SHARED_RABBITMQ_URL
+              value: amqp://xray-rabbitmq:5672/
+            - name: JF_SHARED_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-rabbitmq
+                  key: rabbitmq-password
+            - name: XRAY_HA_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: XRAY_K8S_ENV
+              value: "true"
+          ports:
+            - containerPort: 7002
+              name: http-indexer
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/xray"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:7002/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:7002/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+        - name: xray-persist
+          image: releases-docker.jfrog.io/jfrog/xray-persist:3.52.4
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1035
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - NET_RAW
+          command:
+            - '/bin/bash'
+            - '-c'
+            - >
+              exec /opt/jfrog/xray/app/bin/wrapper.sh;
+          env:
+            - name: JF_SHARED_DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-user
+
+            - name: JF_SHARED_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-password
+            - name: JF_SHARED_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xray-database-creds
+                  key: db-url
+            - name: JF_SHARED_RABBITMQ_USERNAME
+              value: guest
+            - name: JF_SHARED_RABBITMQ_URL
+              value: amqp://xray-rabbitmq:5672/
+            - name: JF_SHARED_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xray-rabbitmq
+                  key: rabbitmq-password
+            - name: XRAY_K8S_ENV
+              value: "true"
+          ports:
+            - containerPort: 7003
+              name: http-persist
+          volumeMounts:
+            - name: data-volume
+              mountPath: "/var/opt/jfrog/xray"
+          resources:
+            {}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:7003/api/v1/system/readiness
+            initialDelaySeconds: 30
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -s -k --fail --max-time 5 http://localhost:7003/api/v1/system/liveness
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: xray
+                    release: xray
+      volumes:
+        - name: systemyaml
+          secret:
+            secretName: xray-system-yaml
+  volumeClaimTemplates:
+    - metadata:
+        name: data-volume
+      spec:
+        storageClassName: "nfs-storageclass"
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
