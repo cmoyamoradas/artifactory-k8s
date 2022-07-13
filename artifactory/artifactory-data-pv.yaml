@@ -11,8 +11,12 @@ metadata:
     id: artifactory-data-pv
     type: nfs-volume
 spec:
+  storageClassName: nfs-storageclass
+    claimRef:
+      name: artifactory-data-pvc
+      namespace: artifactory
   capacity:
-    storage: 1Gi
+    storage: 4Gi
   accessModes:
   - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
