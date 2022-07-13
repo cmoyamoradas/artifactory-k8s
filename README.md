@@ -145,7 +145,7 @@ subjects:
   - kind: ServiceAccount
     name: nfs-pod-provisioner-sa # same as top of the file
     # replace with namespace where provisioner is deployed
-    namespace: default
+    namespace: nfs
 roleRef:
   kind: Role
   name: nfs-pod-provisioner-otherRoles
