@@ -85,7 +85,7 @@ In this example, we’re going to provision NFS resources in both manually and d
 There are some object to be created before deploying the nfs provisioner. Let's create previously a dedicated namespace
 
 ```
-[kubi@master ~]$ kubectl apply -f rbac.yaml --namespace nfs
+[kubi@master ~]$ kubectl create namespace nfs
 ```
 
 Then, we create a [Service Account](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) and some roles and role bindings required by Kubernetes:
