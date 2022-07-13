@@ -28,7 +28,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: nfs-pod-provisioner-sa # defined on top of file
-    namespace: default
+    namespace: nfs
 roleRef: # binding cluster role to service account
   kind: ClusterRole
   name: nfs-provisioner-clusterRole # name defined in clusterRole
