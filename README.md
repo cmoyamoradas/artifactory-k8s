@@ -2,7 +2,7 @@
 
 These are some Kubernetes manifests to deploy a JFrog Artifactory on a Kubernetes cluster.
 
-These manifests are configured to use an external PostgreSQL database and use NFS mounts as storage system for the binaries.
+These manifests are configured to use an external PostgreSQL database and use NFS mounts as storage system for the shared filesystem.
 
 ## On this page
 - Pre-requisites
@@ -122,7 +122,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: nfs-pod-provisioner-sa # defined on top of file
-    namespace: default
+    namespace: nfs
 roleRef: # binding cluster role to service account
   kind: ClusterRole
   name: nfs-provisioner-clusterRole # name defined in clusterRole
@@ -177,7 +177,7 @@ kubi@master ~]$ kubectl apply -f nfs-class.yaml --namespace nfs
 storageclass.storage.k8s.io/nfs-storageclass created
 ```
 
-And finally, we can proceed with the deploy of the nfs provisioner:
+And finally, we can proceed with the deploy of the nfs provisioner, updating the nfs server IP address and the path to the nfs folder:
 
 **nfs-provisioner-deployment.yaml**
 ```
@@ -227,61 +227,53 @@ nfs-pod-provisioner-6fd58ddc6d-nspt8   1/1     Running   0          27s
 ```
 
 ## Deploying a JFrog Artifactory instance
-To setup a JFrog Artifactory instance in Kubernetes, we will require the following objects:
-
-- 5 Secrets:
--- artifactory-access-config
--- artifactory-binarystore
--- artifactory
--- artifactory-systemyaml
--- artifactory-database-creds
-
-- 2 ConfigMaps:
--- artifactory-migration-scripts
--- artifactory-installer-info
-
-- 2 PersistentVolumeClaims:
--- artifactory-backup-pvc
--- artifactory-data-pvc
-
-- 1 Stafefulset:
--- artifactory
-
-- 1 Service, to make accessible the artifactory pod inside the Kubernetes cluster
--- artifactory
-
-First, we create the namespace 'artifactory'
+To setup a JFrog Artifactory instance in Kubernetes, we will require to deploy several objects and always respecting an order.
+First, we create a dedicated namespace:
 ```
 [kubi@master ~]$ kubectl create namespace artifactory
 namespace/artifactory created
 ```
 
-Now, let’s start with the secrets:
+Then, we generate the master and join keys, and create a secret in Kubernetes. Important to name the secret "artifactory"
 ```
-[kubi@master ~]$ kubectl apply -f artifactory-access-config.yaml -f artifactory-binarystore-secret.yaml -f artifactory-secrets.yaml -f artifactory-system.yaml -f artifactory-database-secrets.yaml --namespace artifactory
+[kubi@master ~]$ export MASTER_KEY=$(openssl rand -hex 32)
+echo ${MASTER_KEY}
+93816047a3c0ea7c77f904db87579e2530dc3749ebe0dd113b2413f68af18cc5
+
+[kubi@master ~]$ export JOIN_KEY=$(openssl rand -hex 32)
+echo ${JOIN_KEY}
+d8ce3ef3af5f769a9e0e92d2c62ea27d4752d1c7d790f821f0864f48f9dd3308
+
+[kubi@master ~]$ kubectl create secret generic artifactory --from-literal=master-key=${MASTER_KEY} --from-literal=join-key=${JOIN_KEY} --namespace artifactory
+secret/artifactory created
+```
+
+Now, we create a new secret for the database connection information:
+```
+[kubi@master ~]$ kubectl create secret generic artifactory-database-creds --from-literal=db-user='[USERNAME]' --from-literal=db-password='[PASSWORD]' --from-literal=db-url='jdbc:postgresql://[HOSTANME|IP]:[PORT]/[DATABASE NAME]?sslmode=disable' --namespace artifactory
+secret/artifactory-database-creds created
+```
+
+We need to apply the following three manifests to create additional secrets that we'll reuse in other manifests:
+```
+[kubi@master ~]$ kubectl apply -f artifactory-access-config.yaml -f artifactory-binarystore-secret.yaml  -f artifactory-system.yaml  --namespace artifactory
 secret/artifactory-access-config created
 secret/artifactory-binarystore created
-secret/artifactory created
 secret/artifactory-systemyaml created
-secret/artifactory-database-creds created
-
-[kubi@master ~]$kubectl get secrets --namespace artifactory
+```
+Let's check the secrets before moving forward:
+```
+[kubi@master ~]$ kubectl get secrets --namespace artifactory
 NAME                         TYPE                                  DATA   AGE
-artifactory                  Opaque                                2      14m
-artifactory-access-config    Opaque                                1      14m
-artifactory-binarystore      Opaque                                1      14m
-artifactory-database-creds   Opaque                                3      14m
-artifactory-systemyaml       Opaque                                1      14m
-default-token-6rp2p          kubernetes.io/service-account-token   3      14m
-```
-NOTE: For the database credentials, you may create the secrets using kubectl, ensuring that the name of the secret stays "artifactory-database-creds"
-```
-[kubi@master ~]$kubectl create secret generic artifactory-database-creds --from-literal=db-user='XXXXXX' --from-literal=db-password='YYYYYYY' --from-literal=db-url='jdbc:postgresql://[hostanme|IP]:[port]/[dbname]?sslmode=disable'
+artifactory                  Opaque                                2      7m57s
+artifactory-access-config    Opaque                                1      105s
+artifactory-binarystore      Opaque                                1      105s
+artifactory-database-creds   Opaque                                3      6m29s
+artifactory-systemyaml       Opaque                                1      105s
+default-token-xr5dc          kubernetes.io/service-account-token   3      15m
 ```
 
-
-
-Then, with the Configmaps:
+Let's continue with the Configmaps:
 ```
 [kubi@master ~]$ kubectl apply -f artifactory-migration-scripts.yaml -f artifactory-installer-info.yaml --namespace artifactory
 configmap/artifactory-migration-scripts created
@@ -293,18 +285,35 @@ artifactory-installer-info      1      50s
 artifactory-migration-scripts   3      50s
 kube-root-ca.crt                1      10m
 ```
-PersistentVolumeClaims:
+
+It's the time to create the PersistentVolumes. But before applying the manifest, we need to create the paths that we intend to configure on them.
+That is, we go to the NFS Server, and under the root NFS directory (e.g. /var/nfsshare), we create a folder "data" and another "backup", both required in an HA Artifactory installation.
+These two paths are the ones that we need to configure in the following manifests:
+Important NOTE: Don't forget to make "artifactoy" user (uid 1030) the owner of these two folders.
+```
+[kubi@master ~]$ kubectl apply -f artifactory-data-pv.yaml -f artifactory-backup-pv.yaml --namespace artifactory
+persistentvolume/artifactory-data-pv created
+persistentvolume/artifactory-backup-pv created
+
+[kubi@master ~]$ kubectl get pv --namespace artifactory
+NAME                    CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                                STORAGECLASS       REASON   AGE
+artifactory-backup-pv   4Gi        RWX            Retain           Available   artifactory/artifactory-backup-pvc   nfs-storageclass            37s
+artifactory-data-pv     4Gi        RWX            Retain           Available   artifactory/artifactory-data-pvc     nfs-storageclass            37s
+```
+
+Now, let's apply the PersistentVolumeClaim manifests:
 ```
 [kubi@master ~]$ kubectl apply -f artifactory-data-pvc.yaml -f artifactory-backup-pvc.yaml --namespace artifactory
 persistentvolumeclaim/artifactory-data-pvc created
 persistentvolumeclaim/artifactory-backup-pvc created
 
 [kubi@master ~]$ kubectl get pvc --namespace artifactory
-NAME                     STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS       AGE
-artifactory-backup-pvc   Bound    pvc-131d1583-5358-4b6b-afdc-890bb40bf97e   1G         RWX            nfs-storageclass   39s
-artifactory-data-pvc     Bound    pvc-36c415c0-62ab-4d30-ab75-aac6cfeee91c   1G         RWX            nfs-storageclass   39s
+NAME                     STATUS   VOLUME                  CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+artifactory-backup-pvc   Bound    artifactory-backup-pv   4Gi        RWX                           38s
+artifactory-data-pvc     Bound    artifactory-data-pv     4Gi        RWX                           38s
 ```
-Now it's time for the Statefulset, to create the pod:
+
+At this stage, we can already apply the statefulset manifest, to create the first pod:
 ```
 [kubi@master ~]$ kubectl apply -f artifactory-statefulset.yaml --namespace artifactory
 statefulset.apps/artifactory created
@@ -313,14 +322,16 @@ statefulset.apps/artifactory created
 NAME            READY   STATUS    RESTARTS   AGE
 artifactory-0   1/1     Running   0          2m9s
 ```
-Finally, let's deploy the Service:
+Notice that it can take a few minutes to have the pod in a "ready" status.
+
+Finally, let's deploy the service:
 ```
 [kubi@master ~]$ kubectl apply -f artifactory-service.yaml --namespace artifactory
 service/artifactory created
 
 [kubi@master ~]$ kubectl get svc --namespace artifactory
-NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
-artifactory   ClusterIP   10.105.10.128   <none>        8082/TCP,8081/TCP   31s
+NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
+artifactory   ClusterIP   10.108.102.0   <none>        8082/TCP,8081/TCP   12s
 ```
 
 ## Setup an Ingress Controller
@@ -427,3 +438,17 @@ spec:
   loadBalancerIP: 10.186.0.21 # New property to be added, with the static IP address from the load balancer
  ...
 ```
+## Configure and scale your Artifactory deployment
+At this point, you should be able to access to Artifactory through your preferred browser.
+It's time to configure the licenses. Add to valid licenses before scaling the deployment.
+Once the licenses are already uploaded, proceed with the scaling as follows:
+```
+[kubi@master ~]$ kubectl scale statefulset artifactory --replicas=2 --namespace artifactory
+statefulset.apps/artifactory scaled
+
+[kubi@master ~]$ kubectl get pods --namespace artifactory
+NAME            READY   STATUS    RESTARTS   AGE
+artifactory-0   1/1     Running   0          13m
+artifactory-1   1/1     Running   0          2m47s
+```
+Notice that it can take a few minutes to get the second pod on "ready" status.
