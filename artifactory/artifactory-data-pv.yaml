@@ -22,5 +22,5 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   nfs:
     server: 10.186.0.12
-    path: "/var/nfsshare/data"
+    path: "/var/nfsshare/rt-data"
     readOnly: false
