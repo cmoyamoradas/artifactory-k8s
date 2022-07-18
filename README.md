@@ -173,7 +173,7 @@ parameters:
   archiveOnDelete: "false"
 ```
 ```
-kubi@master ~]$ kubectl apply -f nfs-class.yaml --namespace nfs
+kubi@master ~]$ kubectl apply -f nfs-class.yaml
 storageclass.storage.k8s.io/nfs-storageclass created
 ```
 
@@ -253,8 +253,13 @@ Now, we create a new secret for the database connection information:
 [kubi@master ~]$ kubectl create secret generic artifactory-database-creds --from-literal=db-user='[USERNAME]' --from-literal=db-password='[PASSWORD]' --from-literal=db-url='jdbc:postgresql://[HOSTANME|IP]:[PORT]/[DATABASE NAME]?sslmode=disable' --namespace artifactory
 secret/artifactory-database-creds created
 ```
-
-We need to apply the following three manifests to create additional secrets that we'll reuse in other manifests:
+Before moving forward with the creation of more secrets, let's apply a common label to those that we just created. This label will help us to look for all the resources that are associated to the same application, in this case, "artifactory"
+```
+[kubi@master ~]$ kubectl label secret artifactory-database-creds artifactory app=artifactory -n artifactory
+secret/artifactory-database-creds labeled
+secret/artifactory labeled
+```
+Let's continue applying the following three manifests to create additional secrets that we'll reuse in other manifests:
 ```
 [kubi@master ~]$ kubectl apply -f artifactory-access-config.yaml -f artifactory-binarystore-secret.yaml  -f artifactory-system.yaml  --namespace artifactory
 secret/artifactory-access-config created
