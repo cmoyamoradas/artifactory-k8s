@@ -54,3 +54,5 @@ stringData:
       enabled: true
     mc:
       enabled: true
+    replicator:
+      enabled: true
