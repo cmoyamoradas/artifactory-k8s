@@ -142,7 +142,7 @@ spec:
               mountPath: "/tmp/etc/access.config.patch.yml"
               subPath: access.config.patch.yml
         - name: 'migration-artifactory'
-          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.39.4
+          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.41.12
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -195,7 +195,7 @@ spec:
               mountPath: "/var/opt/jfrog/artifactory-backup"
       containers:
         - name: artifactory
-          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.39.4
+          image: releases-docker.jfrog.io/jfrog/artifactory-pro:7.41.12
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
