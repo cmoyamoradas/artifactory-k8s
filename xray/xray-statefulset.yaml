@@ -83,7 +83,8 @@ spec:
               subPath: system.yaml
       containers:
         - name: router
-          image: releases-docker.jfrog.io/jfrog/router:7.38.0
+          #image: releases-docker.jfrog.io/jfrog/router:7.38.0
+          image: releases-docker.jfrog.io/jfrog/router:7.45.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -144,7 +145,8 @@ spec:
             successThreshold: 1
 
         - name: observability
-          image: releases-docker.jfrog.io/jfrog/observability:1.6.1
+          #image: releases-docker.jfrog.io/jfrog/observability:1.6.1
+          image: releases-docker.jfrog.io/jfrog/observability:1.9.3
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -186,7 +188,8 @@ spec:
             successThreshold: 1
 
         - name: xray-server
-          image: releases-docker.jfrog.io/jfrog/xray-server:3.52.4
+          #image: releases-docker.jfrog.io/jfrog/xray-server:3.52.4
+          image: releases-docker.jfrog.io/jfrog/xray-server:3.55.2
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -265,7 +268,7 @@ spec:
             successThreshold: 1
 
         - name: xray-analysis
-          image: releases-docker.jfrog.io/jfrog/xray-analysis:3.52.4
+          image: releases-docker.jfrog.io/jfrog/xray-analysis:3.55.2
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -348,7 +351,7 @@ spec:
             successThreshold: 1
 
         - name: xray-indexer
-          image: releases-docker.jfrog.io/jfrog/xray-indexer:3.52.4
+          image: releases-docker.jfrog.io/jfrog/xray-indexer:3.55.2
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -426,7 +429,7 @@ spec:
             successThreshold: 1
 
         - name: xray-persist
-          image: releases-docker.jfrog.io/jfrog/xray-persist:3.52.4
+          image: releases-docker.jfrog.io/jfrog/xray-persist:3.55.2
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
