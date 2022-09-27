@@ -36,6 +36,8 @@ stringData:
           maxThreads: 200
           sendReasonPhrase: false
           extraConfig: acceptCount="100"
+      metrics:
+        enabled: true
     frontend:
       session:
         timeMinutes: "30"
@@ -55,6 +57,4 @@ stringData:
     mc:
       enabled: true
     replicator:
-      enabled: true
-    metrics:
       enabled: true
