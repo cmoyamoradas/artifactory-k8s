@@ -56,3 +56,5 @@ stringData:
       enabled: true
     replicator:
       enabled: true
+    metrics:
+      enabled: true

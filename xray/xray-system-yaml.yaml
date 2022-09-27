@@ -22,3 +22,5 @@ stringData:
       database:
         type: postgresql
         driver: org.postgresql.Driver
+    metrics:
+      enabled: true
