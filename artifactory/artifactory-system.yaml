@@ -26,6 +26,14 @@ stringData:
         #url: jdbc:postgresql://10.26.48.3:5432/artifactoryk8s?sslmode=disable
         #username: postgres
         #password: c0nan101
+      metrics:
+        enabled: true
+        filebeat:
+          enabled: true
+          elasticsearch:
+            url: "http://10.186.0.21/elasticsearch/"
+            username: admin
+            password: admin
     artifactory:
       database:
         maxOpenConnections: 80
